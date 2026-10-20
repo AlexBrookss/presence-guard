@@ -72,6 +72,8 @@ HELP_TEXT = (
     " 调试截图目录：~/.cache/presence-guard/debug\n"
     "   仅在使用 --save-debug 时生成；自动保留最新 30 张、最多 7 天，\n"
     "   也可用「清理缓存图片」或 --clean-cache 立即清空。\n"
+    "   图中紫红色高亮只是「深蓝候选像素」的调试标注，不代表判为佩戴；\n"
+    "   只有形成长条形挂绳的像素才会被判定为已佩戴。\n"
     " 精准度测试样本：~/.cache/presence-guard/accuracy\n"
     "   由 tools/accuracy 工具生成，请用其 clean 命令清理。\n"
     " 状态文件：~/.local/state/presence-guard/status.json（供面板读取）\n"

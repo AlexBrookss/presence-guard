@@ -260,9 +260,13 @@ class VisionPipeline:
                     if crop.size:
                         mask = blue_mask(frame[y1:y2, x1:x2], self.cfg.badge)
                         tint = np.zeros_like(crop)
-                        tint[:, :] = (255, 80, 0)
-                        tinted = cv2.addWeighted(crop, 1.0, tint, 0.35, 0)
+                        tint[:, :] = (180, 0, 255)  # magenta overlay
+                        tinted = cv2.addWeighted(crop, 1.0, tint, 0.45, 0)
                         crop[mask > 0] = tinted[mask > 0]
+                        cv2.putText(
+                            out, "magenta = dark-blue candidate pixels (debug only)",
+                            (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                            (180, 0, 255), 1, cv2.LINE_AA)
             label = (f"badge {badge.decision.value} "
                      f"ratio={st.blue_ratio:.3f} votes={badge.present_votes}/"
                      f"{badge.valid_frames}")
