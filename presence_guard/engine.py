@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
+import os
 import math
 import threading
 import time
@@ -28,7 +29,7 @@ from typing import Any, Callable, Optional
 
 from .cache import cleanup_dir
 from .camera import CameraCapture, CameraError
-from .config import Config
+from .config import Config, set_config_value
 from .dbus_api import DesktopActions
 from .idle import IdleMonitor
 from .schedule import BadgeSchedule, WorkdayCalendar, describe_windows
@@ -681,6 +682,25 @@ class Engine:
                               self._last_present, self.last_report,
                               camera=self._last_camera)
                 return {"ok": True, "state": "scheduled"}
+            if cmd == "set_camera":
+                device = str(request.get("device") or "").strip()
+                if not device:
+                    return {"ok": False, "error": "empty device"}
+                self.cfg.camera.device = device
+                config_path = (self.cfg.config_path
+                               or str(Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
+                                      / "presence-guard" / "config.toml"))
+                set_config_value(config_path, "camera", "device", device)
+                self.camera_unavailable = False
+                self.awaiting_presence = False
+                self._cancel_absence("camera switched")
+                self.next_presence_at = self.clock()
+                self.wake_event.set()
+                self.status.add_event(f"摄像头切换到 {device}", "info")
+                self._publish(self._last_state, self._last_state_text,
+                              self._last_present, self.last_report,
+                              camera=self._last_camera)
+                return {"ok": True, "device": device}
             if cmd == "retry_camera":
                 self.pause_until = 0.0
                 self.force_badge = False

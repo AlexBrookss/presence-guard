@@ -12,7 +12,11 @@ Run with ``presence-guard --gui``.
 from __future__ import annotations
 
 import os
+import logging
+import os
+import re
 import shutil
+import stat as stat_mod
 import subprocess
 import sys
 import time
@@ -23,17 +27,20 @@ try:
     from PyQt5.QtCore import QSize, Qt, QTimer
     from PyQt5.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
     from PyQt5.QtWidgets import (
-        QAction, QApplication, QDialog, QFrame, QGridLayout, QHBoxLayout,
-        QLabel, QListWidget, QListWidgetItem, QMenu, QMessageBox,
-        QPlainTextEdit, QPushButton, QSystemTrayIcon, QVBoxLayout, QWidget,
+        QAction, QApplication, QComboBox, QDialog, QFrame, QGridLayout,
+        QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu,
+        QMessageBox, QPlainTextEdit, QPushButton, QSystemTrayIcon,
+        QVBoxLayout, QWidget,
     )
 except ImportError as exc:  # pragma: no cover - depends on desktop packages
     raise SystemExit(
         "需要 python3-pyqt5 才能打开状态面板：sudo apt install python3-pyqt5"
     ) from exc
 
-from .config import Config
+from .config import Config, set_config_value
 from .status import ControlClient, StatusStore
+
+log = logging.getLogger(__name__)
 
 
 HELP_TEXT = (
@@ -152,6 +159,7 @@ class StatusWindow(QWidget):
         self.state_dir = cfg.general.state_dir
         self.client = ControlClient(self.state_dir)
         self.last_events: tuple = ()
+        self._camera_signature: tuple = ()
         self.paused = False
         self.service_active: Optional[bool] = None
         self._service_busy = False
@@ -249,7 +257,6 @@ class StatusWindow(QWidget):
             ("next_presence", "下次在座检测"),
             ("next_badge", "下次工牌检查"),
             ("mode", "工牌判定模式"),
-            ("camera", "摄像头"),
         ]
         for index, (key, caption) in enumerate(entries):
             row, col = divmod(index, 2)
@@ -263,7 +270,26 @@ class StatusWindow(QWidget):
             box.addWidget(val)
             grid.addLayout(box, row, col)
             self.info_labels[key] = val
+
+        # camera picker cell
+        camera_box = QVBoxLayout()
+        camera_box.setSpacing(2)
+        cap = QLabel("摄像头")
+        cap.setObjectName("section")
+        camera_box.addWidget(cap)
+        camera_row = QHBoxLayout()
+        camera_row.setSpacing(4)
+        self.camera_combo = QComboBox()
+        self.camera_combo.setMinimumWidth(150)
+        self.camera_combo.activated.connect(self._camera_changed)
+        camera_row.addWidget(self.camera_combo, 1)
+        self.camera_status_label = QLabel("—")
+        self.camera_status_label.setObjectName("section")
+        camera_row.addWidget(self.camera_status_label, 0)
+        camera_box.addLayout(camera_row)
+        grid.addLayout(camera_box, 1, 1)
         layout.addLayout(grid)
+        self._refresh_camera_list()
         root.addWidget(card)
 
         # buttons: two rows so the labels stay readable at 430 px
@@ -464,8 +490,19 @@ class StatusWindow(QWidget):
         self.info_labels["mode"].setText(mode_text)
         camera = str(data.get("camera") or "ok")
         device = str(data.get("camera_device") or "")
-        self.info_labels["camera"].setText(
-            (device if device else "摄像头") + ("（正常）" if camera == "ok" else "（异常）"))
+        self._refresh_camera_list()
+        if camera == "ok":
+            self.camera_status_label.setText("正常")
+            self.camera_status_label.setStyleSheet("color: #1f9d55; font-size: 12px;")
+        else:
+            self.camera_status_label.setText("不可用")
+            self.camera_status_label.setStyleSheet("color: #d9534f; font-size: 12px;")
+        if device and not self.camera_combo.view().isVisible():
+            if self.camera_combo.findData(device) < 0:
+                self.camera_combo.insertItem(0, device, device)
+            if self.camera_combo.currentData() != device:
+                index = self.camera_combo.findData(device)
+                self.camera_combo.setCurrentIndex(index)
 
         paused_until = data.get("paused_until")
         self.paused = bool(paused_until)
@@ -506,6 +543,7 @@ class StatusWindow(QWidget):
         self.badge_meta.setText("服务停止期间不会检测、不会锁屏、不会提醒")
         for label in self.info_labels.values():
             label.setText("—")
+        self.camera_status_label.setText("—")
         self.pill.setText("服务已停止")
         self.pill.setStyleSheet("color: #d9534f; font-size: 12px;")
         self.service_label.setText("后台服务：已停止")
@@ -523,6 +561,7 @@ class StatusWindow(QWidget):
         self.badge_meta.setText("—")
         for label in self.info_labels.values():
             label.setText("—")
+        self.camera_status_label.setText("—")
         self.pill.setText("未连接")
         self.pill.setStyleSheet("color: #d9534f; font-size: 12px;")
         self.events.clear()
@@ -560,6 +599,62 @@ class StatusWindow(QWidget):
             return False
         QTimer.singleShot(300, self.refresh)
         return True
+
+    @staticmethod
+    def _list_cameras() -> list[tuple[str, str]]:
+        devices: list[tuple[str, str]] = []
+        for path in sorted(Path("/dev").glob("video*")):
+            try:
+                mode = os.stat(path).st_mode
+                if not stat_mod.S_ISCHR(mode):
+                    continue
+            except OSError:
+                continue
+            name = ""
+            try:
+                name_path = Path("/sys/class/video4linux") / path.name / "name"
+                name = name_path.read_text().strip()
+            except OSError:
+                pass
+            devices.append((str(path), name))
+        if not devices:
+            devices.append(("0", "默认摄像头"))
+        return devices
+
+    def _refresh_camera_list(self) -> None:
+        signature = tuple(self._list_cameras())
+        if signature == self._camera_signature:
+            return
+        self._camera_signature = signature
+        self._populate_cameras()
+
+    def _populate_cameras(self) -> None:
+        current = self.camera_combo.currentData()
+        self.camera_combo.blockSignals(True)
+        self.camera_combo.clear()
+        for device, name in self._list_cameras():
+            label = f"{device}  {name}" if name else device
+            self.camera_combo.addItem(label, device)
+        if current and self.camera_combo.findData(current) >= 0:
+            self.camera_combo.setCurrentIndex(self.camera_combo.findData(current))
+        self.camera_combo.blockSignals(False)
+
+    def _camera_changed(self, index: int) -> None:
+        device = self.camera_combo.itemData(index)
+        if not device:
+            return
+        if self._send("set_camera", device=device):
+            self._persist_camera(device)
+            if self.tray is not None:
+                self.tray.showMessage("摄像头", f"已切换到 {device}，正在检测…",
+                                      QSystemTrayIcon.Information, 1500)
+
+    def _persist_camera(self, device: str) -> None:
+        path = (self.cfg.config_path
+                or str(Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
+                       / "presence-guard" / "config.toml"))
+        if not set_config_value(path, "camera", "device", device):
+            log.debug("cannot persist camera device %s", device)
 
     def _update_buttons(self) -> None:
         running = self.service_active is not False

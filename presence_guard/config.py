@@ -6,6 +6,7 @@ stdlib ``tomllib``.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
@@ -208,6 +209,64 @@ def load_config(path: Optional[str] = None) -> Config:
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ConfigError(message)
+
+
+def set_config_value(path: str | Path, section: str, key: str,
+                     value: object) -> bool:
+    """Update one key of a TOML config in place (create it if missing).
+
+    Returns True when the file was written.
+    """
+
+    import re
+
+    text = ""
+    target = Path(path).expanduser()
+    try:
+        text = target.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        text = ""
+    except OSError:
+        return False
+
+    if isinstance(value, str):
+        rendered = json.dumps(value, ensure_ascii=False)
+    elif isinstance(value, bool):
+        rendered = "true" if value else "false"
+    else:
+        rendered = str(value)
+
+    lines = text.splitlines()
+    current = None
+    done = False
+    section_header_index: int | None = None
+    out: list[str] = []
+    for index, line in enumerate(lines):
+        match = re.match(r"^\[(.+)\]$", line.strip())
+        if match:
+            current = match.group(1)
+            if current == section:
+                section_header_index = len(out)
+        if current == section and re.match(rf"^{key}\s*=", line):
+            out.append(f"{key} = {rendered}")
+            done = True
+            continue
+        out.append(line)
+    if not done:
+        if section_header_index is not None:
+            # Insert right after the existing section header.
+            out.insert(section_header_index + 1, f"{key} = {rendered}")
+        else:
+            if out and out[-1].strip() == "":
+                out.pop()
+            out.append(f"[{section}]")
+            out.append(f"{key} = {rendered}")
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        target.write_text("\n".join(out) + "\n", encoding="utf-8")
+        return True
+    except OSError:
+        return False
 
 
 def validate_config(cfg: Config) -> None:

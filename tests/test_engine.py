@@ -404,6 +404,17 @@ class EngineTests(unittest.TestCase):
         self.tick(engine, 65, present())
         self.assertFalse(engine.camera_unavailable)
 
+    def test_set_camera_command(self):
+        engine = self.make_engine()
+        self.clock[0] = 10
+        engine.next_presence_at = 999
+        response = engine._handle_control({
+            "cmd": "set_camera", "device": "/dev/video2"})
+        self.assertTrue(response["ok"])
+        self.assertEqual(engine.cfg.camera.device, "/dev/video2")
+        self.assertEqual(engine.next_presence_at, 10)
+        self.assertFalse(engine.camera_unavailable)
+
     def test_retry_camera_command(self):
         engine = self.make_engine()
         self.clock[0] = 10

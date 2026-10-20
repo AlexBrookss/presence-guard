@@ -62,6 +62,8 @@ def _parser() -> argparse.ArgumentParser:
                    help="请求立即检查一次工牌（即使不在检查时段）")
     p.add_argument("--retry-camera", action="store_true",
                    help="摄像头恢复后立即重试（暂停状态）")
+    p.add_argument("--set-camera", metavar="DEVICE",
+                   help="切换摄像头设备，例如 /dev/video1 或 0")
     p.add_argument("--start-service", action="store_true",
                    help="启动后台服务")
     p.add_argument("--stop-service", action="store_true",
@@ -323,10 +325,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             return 3
 
     if (args.check_now or args.check_badge_now or args.retry_camera
-            or args.pause or args.resume):
+            or args.set_camera or args.pause or args.resume):
         client = ControlClient(cfg.general.state_dir)
         if args.check_now:
             result = client.send("check_now")
+        elif args.set_camera:
+            result = client.send("set_camera", device=args.set_camera)
         elif args.check_badge_now:
             result = client.send("check_badge")
         elif args.retry_camera:
