@@ -1,0 +1,5 @@
+opencv-python-headless==4.10.0.84
+numpy==1.21.6; python_version < "3.8"
+numpy>=1.24,<3; python_version >= "3.8"
+tomli>=1.2.3; python_version < "3.11"
+chinesecalendar==1.11.0

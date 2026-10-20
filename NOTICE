@@ -1,0 +1,30 @@
+presence-guard
+==============
+
+本项目的 Python 代码以 Apache-2.0 许可证发布（见 LICENSE）。
+
+第三方组件
+----------
+
+1. OpenCV (opencv-python-headless)
+   License: Apache-2.0
+   https://opencv.org/
+
+2. NanoDet / NanoDet-Plus
+   License: Apache-2.0
+   https://github.com/RangiLyu/nanodet
+   模型来源：OpenCV Zoo
+   https://github.com/opencv/opencv_zoo/tree/main/models/object_detection_nanodet
+   文件：models/nanodet.onnx
+   SHA256: 4b82da9944b88577175ee23a459dce2e26e6e4be573def65b1055dc2d9720186
+
+3. YuNet face detector
+   License: MIT
+   https://github.com/ShiqiYu/libfacedetection
+   模型来源：OpenCV Zoo
+   https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet
+   文件：models/yunet.onnx
+   SHA256: 8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4
+
+NanoDet 后处理逻辑参考了 OpenCV Zoo 的 NanoDet demo（Apache-2.0），
+已在 presence_guard/nanodet.py 文件头注明。

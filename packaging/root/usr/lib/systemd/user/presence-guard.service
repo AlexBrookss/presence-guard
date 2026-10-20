@@ -1,0 +1,19 @@
+[Unit]
+Description=Presence Guard (auto lock + badge reminder)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/share/presence-guard/app
+ExecStart=/usr/share/presence-guard/venv/bin/python -m presence_guard
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=10
+Nice=19
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=graphical-session.target

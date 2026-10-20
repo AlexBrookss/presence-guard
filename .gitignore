@@ -1,0 +1,13 @@
+.venv/
+.build-venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+debug/
+*.log
+*.jpg
+!tests/data/*.jpg
+build/
+dist/
+*.deb

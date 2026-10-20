@@ -1,0 +1,22 @@
+#!/bin/sh
+# Create the bundled virtualenv so the guard runs offline.
+set -e
+
+APP="/usr/share/presence-guard"
+if command -v python3 >/dev/null 2>&1; then
+    rm -rf "$APP/venv"
+    if python3 -m venv --system-site-packages "$APP/venv" 2>/dev/null; then
+        # A fresh venv ships an old pip; upgrade it from the bundled wheel first.
+        "$APP/venv/bin/python" -m pip install --disable-pip-version-check -q \
+            --no-index --find-links "$APP/wheels" "pip==23.3.2" 2>/dev/null || true
+        "$APP/venv/bin/python" -m pip install --disable-pip-version-check -q \
+            --no-index --find-links "$APP/wheels" \
+            -r "$APP/app/requirements.txt" 2>/dev/null || true
+    fi
+fi
+chmod 0755 /usr/bin/presence-guard
+
+echo "presence-guard 已安装。"
+echo "请为当前用户执行一次: presence-guard --setup"
+echo "（生成配置、应用菜单与登录自启动，并启用后台服务）"
+exit 0

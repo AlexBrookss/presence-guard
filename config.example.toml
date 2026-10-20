@@ -1,0 +1,141 @@
+# presence-guard 配置示例
+# 复制到 ~/.config/presence-guard/config.toml 后按需修改。
+# 所有时间单位均为秒。
+
+[general]
+log_level = "INFO"
+# 状态文件（通知冷却、上次检查时间）目录
+state_dir = "~/.local/state/presence-guard"
+# 摄像头打不开时是否发通知提醒（默认只写日志）
+notify_on_camera_error = false
+# 进程 nice 值；低性能机器可设 19（systemd service 已设 Nice=19）
+nice = 19
+# --save-debug 生成的标注图片目录；每次写入后自动清理旧文件
+debug_dir = "~/.cache/presence-guard/debug"
+# 最多保留最新多少张（0 = 不按数量限制）
+debug_keep_files = 30
+# 超过多少天的图片删除（0 = 不按时间限制）
+debug_max_age_days = 7
+
+[camera]
+# 也可以是 "0"（OpenCV 索引）
+device = "/dev/video0"
+# 在座检测用低分辨率，降低 USB 带宽/解码/推理开销
+presence_width = 320
+presence_height = 240
+# 工牌检测才用高分辨率
+badge_width = 640
+badge_height = 480
+fourcc = "MJPG"
+fps = 10
+# 每次打开摄像头先丢弃的帧数，用于自动曝光稳定
+warmup_frames = 2
+open_timeout_seconds = 8.0
+# 每次“在座检测”抓取的帧数（2 帧，快速扫一眼）
+presence_frames = 1
+# 每次“工牌检测”抓取的帧数
+badge_frames = 5
+
+[detector]
+nanodet_model = "models/nanodet.onnx"
+yunet_model = "models/yunet.onnx"
+# NanoDet 只在“疑似无人”的 10 秒确认阶段运行，用于兜底检测背对/侧身的人
+# 置信度调低更宽松，但更容易把背景中的人算进来
+person_confidence = 0.30
+face_confidence = 0.60
+# 人体框高度至少占画面的比例，用于过滤远处路人
+min_person_height_ratio = 0.18
+# 只接受画面中央这个比例范围内的人（0.9 = 中央 90%）
+center_zone_ratio = 0.90
+# 只看到脸（例如坐得很近）时，脸宽至少占画面的比例
+face_presence_min_width_ratio = 0.045
+# 全黑/被遮挡的画面按“摄像头异常”处理，绝不因此锁屏
+min_frame_mean = 10.0
+min_frame_std = 5.0
+# OpenCV DNN 线程数；低性能机器用 1，避免多线程抢占 CPU
+cv_threads = 1
+
+[badge]
+# 是否启用工牌检查
+enabled = true
+# 节假日识别："chinese" 使用 chinesecalendar 识别法定节假日与调休；
+# "weekdays" 使用下面的周一至周五（数据不可用时也会回退到它）
+holiday_mode = "chinese"
+# 回退用的工作日：0=周一 ... 6=周日
+workdays = [0, 1, 2, 3, 4]
+# 工牌检查时间窗（本地时间），只在这些时间段内检查
+windows = ["09:30-10:00", "13:00-13:30"]
+# 时间窗内每 180 秒（3 分钟）检查一次
+interval_seconds = 180
+
+# 深蓝色 HSV 范围（OpenCV：H 0-180，S/V 0-255）
+# 深海军蓝通常 H≈105-125；如果现场偏紫/偏青，可适当放宽。
+hue_min = 95
+hue_max = 140
+saturation_min = 40
+value_min = 12
+value_max = 220
+
+# ROI 太小、脸太小、画面太暗时判为 unknown，不发通知
+min_roi_width = 56
+min_roi_height = 56
+min_roi_area = 3600
+min_face_width_ratio = 0.055
+min_brightness = 32.0
+
+# 蓝色像素占 ROI 比例达到该值，或最大蓝色连通块达到该像素数，即视为佩戴
+min_blue_ratio = 0.006
+min_blue_pixels = 180
+# 只统计靠近下巴中线的蓝色块：偏离中心超过 N 倍脸宽的蓝色
+# （风扇、杯子、椅子等边缘物体）直接忽略
+max_horizontal_offset_ratio = 0.50
+# 工牌是深藏青，亮蓝色（塑料风扇/天空反光）不算；超过该 V 值忽略
+max_badge_value = 150
+# 蓝色占比超过该值，认为可能是蓝色衣服，按“已佩戴”处理（宽松策略）
+blue_clothing_ratio = 0.55
+
+# 识别模式：
+#   "strap"（默认，宽松）—— 只要脖子上有蓝色挂绳就算佩戴
+#   "card"（严格）—— 必须看到卡片形状；只挂绳、卡片已摘下算未佩戴
+mode = "strap"
+# 以下仅在 mode = "card" 时生效
+min_card_aspect = 0.45
+max_card_aspect = 1.15
+min_card_fill = 0.55
+min_card_pixels = 220
+
+# 至少要有 3 帧有效画面，其中 2 帧看到蓝色才判为佩戴
+min_valid_frames = 3
+present_frame_votes = 2
+
+# 每个检查时间窗最多提醒 3 次
+max_reminders_per_window = 3
+# 两次提醒之间的最短间隔；配合 3 次上限，会分散在 30 分钟窗口内
+notify_cooldown_seconds = 600
+notify_title = "工牌提醒"
+notify_body = "检测到您在座位上，但没有识别到深蓝色工牌，请确认是否佩戴。"
+notify_timeout_ms = 8000
+
+[scheduler]
+# 每 60 秒检查一次；若键鼠活跃则跳过摄像头（见 idle_gate_seconds）
+presence_interval_seconds = 60
+# 检测未发现人后，10 秒时复检；仍无人则锁屏
+absence_confirm_seconds = 10
+absence_recheck_seconds = 10
+# 空闲多少秒才允许打开摄像头；键鼠活跃时完全不碰摄像头
+# 设为 0 可关闭这个优化（恢复每次都用摄像头检测）
+idle_gate_seconds = 10
+# auto: 自动寻找 xprintidle；xprintidle: 强制使用；disabled: 关闭空闲检测
+idle_provider = "auto"
+# 启动后延迟多少秒开始第一次检测
+startup_delay_seconds = 5
+# 锁屏后每 60 秒查询一次锁屏状态；锁屏期间完全不碰摄像头
+locked_poll_seconds = 60
+# 摄像头/模型异常后的重试间隔
+camera_error_retry_seconds = 300
+camera_error_notify_cooldown_seconds = 3600
+# 设为 false 可只提醒不锁屏
+lock_enabled = true
+# 非工作日（周末/法定节假日/调休放假）是否仍然自动锁屏；
+# false = 节假日只监测、不锁屏（推荐），true = 照常锁屏
+lock_on_holidays = false

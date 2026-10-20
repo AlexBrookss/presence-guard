@@ -1,0 +1,10 @@
+#!/bin/sh
+# presence-guard launcher (installed by the deb package).
+APP_DIR="/usr/share/presence-guard"
+if [ -x "$APP_DIR/venv/bin/python" ]; then
+    PY="$APP_DIR/venv/bin/python"
+else
+    PY="/usr/bin/python3"
+fi
+cd "$APP_DIR/app" || exit 1
+exec "$PY" -m presence_guard "$@"

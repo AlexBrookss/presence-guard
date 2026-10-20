@@ -1,0 +1,5 @@
+#!/bin/sh
+# Remove the virtualenv created in postinst (dpkg does not track it).
+set -e
+rm -rf /usr/share/presence-guard/venv
+exit 0

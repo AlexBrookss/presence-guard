@@ -1,0 +1,14 @@
+Package: presence-guard
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: UnionTech <support@uniontech.com>
+Depends: python3 (>= 3.7), python3-pyqt5, python3-gi, python3-venv, python3-pip
+Recommends: xprintidle
+Description: 在座检测与工牌提醒 (Desk presence guard)
+ 定时检测是否在座，离座 10 秒后自动锁屏；在工作日指定时段
+ 检测是否佩戴深蓝色工牌，未佩戴时发送桌面通知（每时段最多 3 次）。
+ 使用 chinesecalendar 识别法定节假日与调休。
+ 附带 PyQt5 状态面板与托盘图标。
+ 安装后请执行: presence-guard --setup

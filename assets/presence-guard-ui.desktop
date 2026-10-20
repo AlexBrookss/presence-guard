@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Presence Guard
+Name[zh_CN]=在岗守护
+GenericName=Desk presence and badge monitor
+GenericName[zh_CN]=在座检测与工牌提醒
+Comment=Shows whether you are at your desk and wearing your badge
+Comment[zh_CN]=显示当前是在工位还是离座，以及是否佩戴工牌
+Exec=@APP_DIR@/venv/bin/python -m presence_guard --gui
+Path=@APP_DIR@/app
+Icon=presence-guard
+Terminal=false
+Categories=Utility;Office;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
