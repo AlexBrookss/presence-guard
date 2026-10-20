@@ -138,7 +138,7 @@ org.freedesktop.Notifications 由 DDE 通知服务提供
 - `python3-venv`、`python3-gi`、`python3-pyqt5`（面板用，deb 已声明依赖）
 - 可选 `xprintidle`（deb 的 Recommends）：键鼠活跃时跳过摄像头，
   是低性能机器最有效的省资源手段；没有它会退化为每 60 秒都打开摄像头。
-- `chinesecalendar`（pip，deb 内置 wheel）：法定节假日与调休识别。
+- `chinesecalendar`（pip）：法定节假日与调休识别（离线 deb 内置 wheel）。
 - 摄像头 `/dev/video0`（或其它 V4L2 设备）
 - 当前用户在 `video` 组，或设备 ACL 已授予当前用户读写权限：
 
@@ -151,7 +151,23 @@ sudo usermod -aG video "$USER"
 > 在 UOS 20 的 Python 3.7.3 上可以直接安装；虚拟环境必须带
 > `--system-site-packages`，否则看不到系统的 `python3-gi`。
 
-### 一键安装（推荐）
+### deb 安装（推荐）
+
+仓库自带打包脚本，两种产物：
+
+```bash
+bash scripts/build-deb.sh          # 精简版（默认，约 4 MB）：安装时联网装依赖
+FULL=1 bash scripts/build-deb.sh   # 离线版（约 85 MB）：wheel 内置，适合内网
+sudo dpkg -i dist/presence-guard_0.1.0_amd64.deb
+presence-guard --setup            # 生成配置、应用菜单/登录自启动并启用服务
+```
+
+精简版安装时需要 pip 网络，默认用清华镜像；可写 `/etc/default/presence-guard`
+里的 `PIP_INDEX=...` 换成内网镜像。离线版默认只带 UOS 20 用到的
+Python 3.7/3.10 的 numpy wheel（`PY_ABIS="37 38 39 310"` 可全量），
+比早期 117 MB 的全家桶小很多。
+
+### 一键安装（源码，开发者用）
 
 ```bash
 cd presence-guard
@@ -421,7 +437,7 @@ presence_guard/
   gui.py          # PyQt5 状态面板与托盘图标
   cache.py        # 调试图片自动清理
 packaging/       # deb 打包（DEBIAN/control、postinst、systemd unit、desktop）
-scripts/build-deb.sh  # 构建离线 deb（wheel 内置）
+scripts/build-deb.sh  # 构建 deb：默认精简版（~4MB），FULL=1 离线版（~85MB）
   vision.py       # YuNet 优先；疑似无人确认时才用 NanoDet；ROI 标注
   nanodet.py      # NanoDet ONNX 后处理（OpenCV DNN）
   badge.py        # 胸口 ROI + HSV 深蓝色启发式 + 多帧投票

@@ -1,0 +1,32 @@
+#!/bin/sh
+# Slim variant: download the Python wheels during installation.
+# Default index is the Tsinghua mirror; override with
+#   /etc/default/presence-guard   ->  PIP_INDEX=...
+# or at build time the full/offline variant is preferred for air-gapped hosts.
+set -e
+
+APP="/usr/share/presence-guard"
+if command -v python3 >/dev/null 2>&1; then
+    rm -rf "$APP/venv"
+    if python3 -m venv --system-site-packages "$APP/venv" 2>/dev/null; then
+        INDEX=""
+        if [ -f /etc/default/presence-guard ]; then
+            # shellcheck disable=SC1091
+            . /etc/default/presence-guard
+        fi
+        PIP_INDEX="${PRESENCE_GUARD_PIP_INDEX:-${PIP_INDEX:-https://pypi.tuna.tsinghua.edu.cn/simple}}"
+        "$APP/venv/bin/python" -m pip install --disable-pip-version-check -q \
+            -U "pip<24" -i "$PIP_INDEX" 2>/dev/null || true
+        if ! "$APP/venv/bin/python" -m pip install --disable-pip-version-check -q \
+                -i "$PIP_INDEX" -r "$APP/app/requirements.txt" 2>/dev/null; then
+            echo "警告: Python 依赖下载失败（检查网络或 PIP_INDEX）。"
+            echo "      稍后执行: sudo /usr/share/presence-guard/venv/bin/python -m pip install -r $APP/app/requirements.txt"
+        fi
+    fi
+fi
+chmod 0755 /usr/bin/presence-guard
+
+echo "presence-guard 已安装。"
+echo "请为当前用户执行一次: presence-guard --setup"
+echo "（生成配置、应用菜单与登录自启动，并启用后台服务）"
+exit 0
