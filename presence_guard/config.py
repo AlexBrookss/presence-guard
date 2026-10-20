@@ -97,7 +97,12 @@ class BadgeConfig:
     min_face_width_ratio: float = 0.055
     min_brightness: float = 32.0
     min_blue_ratio: float = 0.006
-    min_blue_pixels: int = 180
+    # Minimum bounding-box area of a blue blob (filter for clothing specks).
+    min_blue_pixels: int = 300
+    # Strip detection: the badge is a long, narrow dark-blue band (lanyard),
+    # not scattered blue dots.
+    min_strip_length_ratio: float = 0.45
+    max_strip_width_ratio: float = 0.28
     # Ignore blue blobs whose centre is further than N face-widths from the
     # body centre line (fans, mugs, chairs at the edge of the chest box).
     max_horizontal_offset_ratio: float = 0.50
@@ -310,6 +315,10 @@ def _validate(cfg: Config) -> None:
              "badge ROI limits are too small")
     _require(0.0 <= badge.min_blue_ratio <= 1.0, "badge.min_blue_ratio is out of range")
     _require(badge.min_blue_pixels >= 0, "badge.min_blue_pixels must be >= 0")
+    _require(0.1 <= badge.min_strip_length_ratio <= 1.0,
+             "badge.min_strip_length_ratio must be in [0.1, 1.0]")
+    _require(0.1 <= badge.max_strip_width_ratio <= 1.0,
+             "badge.max_strip_width_ratio must be in [0.1, 1.0]")
     _require(0.0 < badge.min_face_width_ratio < 1.0,
              "badge.min_face_width_ratio must be in (0, 1)")
     _require(0.0 < badge.max_horizontal_offset_ratio <= 1.5,

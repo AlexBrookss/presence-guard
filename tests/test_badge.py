@@ -13,8 +13,8 @@ def synthetic_frame(blue=True, brightness=45):
     cv2.rectangle(frame, (200, 120), (440, 479), (70, 70, 75), -1)
     cv2.ellipse(frame, (320, 105), (48, 60), 0, 0, 360, (150, 180, 215), -1)
     color = (110, 45, 20) if blue else (30, 30, 200)
-    cv2.rectangle(frame, (300, 185), (345, 235), color, -1)
-    cv2.rectangle(frame, (312, 150), (318, 190), color, -1)
+    cv2.rectangle(frame, (300, 215), (345, 265), color, -1)
+    cv2.rectangle(frame, (312, 152), (318, 210), color, -1)
     return frame, Box(180, 40, 460, 479), Box(275, 50, 365, 160)
 
 

@@ -1,16 +1,23 @@
 """Chest-ROI extraction and the "dark blue badge" colour heuristic.
 
-The badge is deliberately detected loosely: a blue lanyard strap or a blue
-card near the chest counts as "wearing it".  Two things keep the loose rule
-from firing on random blue objects (a fan, a mug, a chair):
+The badge is a **dark blue strip** (lanyard band) hanging from the neck, not
+scattered blue dots.  So, besides the colour/geometry filters (close to the
+body centre line, dark navy only), the strap mode requires an *elongated*
+structure:
 
 1. **Geometry** - only blue blobs in the band under the chin, close to the
    body's vertical centre line, vote.  A blue object at the edge of the chest
-   box (dx > ~0.6 face widths) is ignored.
-2. **Colour** - the badge navy is dark and saturated.  Sky/glass reflections
-   and bright blue plastic are usually much lighter, so a V ceiling is
-   applied only to the *badge* rule (the "blue clothing" escape hatch stays
-   generous, to avoid nagging).
+   box (dx > ~0.5 face widths) is ignored.
+2. **Colour** - the badge navy is dark and saturated; bright blue plastic /
+   sky reflections are above the V ceiling.
+3. **Shape** - a counted blob whose minimum-area rectangle is long
+   (>= 0.45 face heights) and narrow (<= 0.28 face widths) counts as the
+   lanyard strip.  Clothing dots are too short and clothing regions are too
+   wide, so neither passes.
+
+The "card" mode additionally accepts a compact solid card-shaped blob.
+The generous "whole chest is blue" escape hatch (blue clothing) still avoids
+nagging someone in a navy shirt.
 
 When the view is too poor to judge (face missing, too dark, too small) the
 result is UNKNOWN and no notification is sent.
@@ -18,7 +25,6 @@ result is UNKNOWN and no notification is sent.
 
 from __future__ import annotations
 
-import math
 from typing import Optional
 
 import cv2
@@ -99,7 +105,7 @@ def _blob_is_on_lanyard(blob_box: tuple[int, int, int, int],
     if dx > cfg.max_horizontal_offset_ratio:
         return False
 
-    # Reject tiny far-away specks (glass, reflections).
+    # Reject tiny specks: clothing dots are small scattered blobs.
     if bw * bh < cfg.min_blue_pixels:
         return False
     return True
@@ -144,6 +150,10 @@ def analyze_badge_roi(frame_bgr: np.ndarray, roi: Optional[Box],
     lanyard_pixels = 0
     lanyard_largest = 0
     card_largest = 0
+    lanyard_mask = np.zeros_like(mask)
+    strip_detected = False
+    max_blob_long = 0.0
+    min_blob_short = 1e9
     for i in range(1, count):
         area = int(stats[i, cv2.CC_STAT_AREA])
         if area < 20:
@@ -164,11 +174,27 @@ def analyze_badge_roi(frame_bgr: np.ndarray, roi: Optional[Box],
             continue
         lanyard_pixels += area
         lanyard_largest = max(lanyard_largest, area)
+        lanyard_mask[blob_box[1]:blob_box[1] + blob_box[3],
+                     blob_box[0]:blob_box[0] + blob_box[2]] |= blob_mask
+
+        # Fitted rectangle of the blob: a strap segment is long and narrow.
+        # The test applies to a single blob, never across blobs (otherwise a
+        # wide shirt region plus a far-away dot would "combine" into a strip).
+        points = cv2.findNonZero(blob_mask)
+        if points is not None and len(points) >= 5:
+            (_, (long, short), _) = cv2.minAreaRect(points)
+            if long < short:
+                long, short = short, long
+            max_blob_long = max(max_blob_long, float(long))
+            min_blob_short = min(min_blob_short, float(short))
+            if (long >= cfg.min_strip_length_ratio * geometry.face_height
+                    and short <= cfg.max_strip_width_ratio * geometry.face_width):
+                strip_detected = True
+
         bw, bh = blob_box[2], blob_box[3]
         aspect = bw / float(max(bh, 1))
         fill = area / float(max(bw * bh, 1))
-        # A lanyard strap is long and thin; the card is a compact rectangle.
-        # Needed only for badge.mode = "card".
+        # A compact solid rectangle; needed only for badge.mode = "card".
         if (cfg.min_card_aspect <= aspect <= cfg.max_card_aspect
                 and fill >= cfg.min_card_fill
                 and area >= cfg.min_card_pixels):
@@ -176,15 +202,15 @@ def analyze_badge_roi(frame_bgr: np.ndarray, roi: Optional[Box],
 
     ratio = lanyard_pixels / float(total) if total else 0.0
     # An all-blue torso is more likely a navy shirt than a missing badge;
-    # keep the original generous escape hatch so we never nag about clothing.
+    # keep the generous escape hatch so we never nag about clothing.
     all_blue_ratio = blue_pixels / float(total) if total else 0.0
+
     if cfg.mode == "card":
         # A bare lanyard is not a badge: require a card-shaped blob.
         present = bool(card_largest >= cfg.min_card_pixels)
     else:
         present = bool(
-            lanyard_largest >= cfg.min_blue_pixels
-            or (ratio >= cfg.min_blue_ratio and lanyard_largest >= 40)
+            strip_detected
             or all_blue_ratio >= cfg.blue_clothing_ratio
         )
 
@@ -197,6 +223,10 @@ def analyze_badge_roi(frame_bgr: np.ndarray, roi: Optional[Box],
         largest_area=lanyard_largest,
         mean_v=mean_v,
         face_width=face.width,
+        max_blob_long_ratio=(max_blob_long / max(geometry.face_height, 1.0)),
+        min_blob_short_ratio=(min_blob_short / max(geometry.face_width, 1.0)
+                              if min_blob_short < 1e8 else 0.0),
+        all_blue_ratio=all_blue_ratio,
         present=present,
     )
 
@@ -223,7 +253,11 @@ def decide(stats: list[BlueStats], cfg: BadgeConfig) -> BadgeResult:
 
     if votes >= cfg.present_frame_votes:
         decision = BadgeDecision.PRESENT
-        reason = f"{votes}/{len(valid)} frames show dark blue near the neck"
+        best = max(valid, key=lambda s: s.largest_area)
+        reason = (f"{votes}/{len(valid)} frames show a dark-blue strip near "
+                  f"the neck (largest {best.largest_area} px, "
+                  f"blob {best.max_blob_long_ratio:.2f}fh x "
+                  f"{best.min_blob_short_ratio:.2f}fw)")
     elif votes == 0:
         decision = BadgeDecision.ABSENT
         reason = f"0/{len(valid)} frames show dark blue near the neck"

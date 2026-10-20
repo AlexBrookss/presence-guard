@@ -83,9 +83,12 @@ min_roi_area = 3600
 min_face_width_ratio = 0.055
 min_brightness = 32.0
 
-# 蓝色像素占 ROI 比例达到该值，或最大蓝色连通块达到该像素数，即视为佩戴
-min_blue_ratio = 0.006
-min_blue_pixels = 180
+# 蓝色连通块包围盒面积小于该值视为衣物噪点直接忽略
+min_blue_pixels = 300
+# 条状判定：最小外接矩形长边至少这么长（相对脸高），才算挂绳
+min_strip_length_ratio = 0.45
+# 条状判定：最小外接矩形短边不超过这么多（相对脸宽）
+max_strip_width_ratio = 0.28
 # 只统计靠近下巴中线的蓝色块：偏离中心超过 N 倍脸宽的蓝色
 # （风扇、杯子、椅子等边缘物体）直接忽略
 max_horizontal_offset_ratio = 0.50

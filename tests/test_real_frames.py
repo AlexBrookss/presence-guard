@@ -9,7 +9,7 @@ Fixtures
                          of the chest box.
 
 The last two are the important ones: a naive "any blue pixel" rule fires on
-the fan and on the bare lanyard.
+the fan and on blue clothing dots; the strip detector must not.
 """
 
 import os
@@ -25,8 +25,9 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 WORN = os.path.join(DATA_DIR, "badge_worn.jpg")
 STRAP_ONLY = os.path.join(DATA_DIR, "badge_strap_only.jpg")
 REMOVED = os.path.join(DATA_DIR, "badge_removed.jpg")
+BLUE_SHIRT = os.path.join(DATA_DIR, "badge_blue_shirt.jpg")
 
-FRAMES = (WORN, STRAP_ONLY, REMOVED)
+FRAMES = (WORN, STRAP_ONLY, REMOVED, BLUE_SHIRT)
 HAVE_FIXTURES = all(os.path.exists(p) for p in FRAMES)
 
 
@@ -51,11 +52,13 @@ class RealFrameTests(unittest.TestCase):
         self._cache[key] = result
         return result
 
-    def test_strap_mode_counts_a_lanyard(self):
+    def test_strap_mode_requires_an_elongated_strip(self):
+        # A full lanyard band is a long strip -> worn.
         self.assertEqual(self._analyse(WORN, "strap").decision,
                          BadgeDecision.PRESENT)
+        # Short strap fragments are not a strip -> treated as not worn.
         self.assertEqual(self._analyse(STRAP_ONLY, "strap").decision,
-                         BadgeDecision.PRESENT)
+                         BadgeDecision.ABSENT)
         self.assertEqual(self._analyse(REMOVED, "strap").decision,
                          BadgeDecision.ABSENT)
 
@@ -66,6 +69,13 @@ class RealFrameTests(unittest.TestCase):
                          BadgeDecision.ABSENT)
         self.assertEqual(self._analyse(REMOVED, "card").decision,
                          BadgeDecision.ABSENT)
+
+    def test_blue_clothing_dots_never_vote(self):
+        # Dark blue shirt with scattered blue dots near the collar: neither
+        # the dots nor the wide shirt region form a strip.
+        result = self._analyse(BLUE_SHIRT, "strap")
+        self.assertEqual(result.decision, BadgeDecision.ABSENT, result.reason)
+        self.assertEqual(result.present_votes, 0)
 
     def test_blue_fan_never_votes(self):
         result = self._analyse(REMOVED, "strap")

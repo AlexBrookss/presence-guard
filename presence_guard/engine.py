@@ -811,7 +811,14 @@ class Engine:
             report.badge = badge
             report.action = f"badge_{badge.decision.value}"
 
-        annotated = self.vision.annotate(frame, presence, badge) if frame is not None else None
+        # Annotate the badge frame that actually voted, not the presence frame.
+        display = frame
+        if (badge is not None and badge.best_index is not None
+                and image_path is None
+                and self.cfg.camera.presence_frames < len(frames)
+                and badge.best_index < len(frames) - self.cfg.camera.presence_frames):
+            display = frames[self.cfg.camera.presence_frames + badge.best_index]
+        annotated = self.vision.annotate(display, presence, badge) if display is not None else None
         if debug_dir is not None and annotated is not None:
             import cv2
             debug_dir = Path(debug_dir).expanduser()

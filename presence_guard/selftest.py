@@ -21,8 +21,8 @@ def _synthetic_frame(with_badge: bool, blue: bool = True) -> tuple[np.ndarray, B
     face = Box(275, 50, 365, 160)
     if with_badge:
         color = (110, 45, 20) if blue else (30, 30, 200)  # BGR: navy / red
-        cv2.rectangle(frame, (300, 185), (345, 235), color, -1)
-        cv2.rectangle(frame, (312, 150), (318, 190), color, -1)
+        cv2.rectangle(frame, (300, 215), (345, 265), color, -1)
+        cv2.rectangle(frame, (312, 152), (318, 210), color, -1)
     return frame, person, face
 
 

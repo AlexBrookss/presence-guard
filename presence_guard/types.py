@@ -89,6 +89,9 @@ class BlueStats:
     largest_area: int = 0
     mean_v: float = 0.0
     face_width: float = 0.0
+    max_blob_long_ratio: float = 0.0
+    min_blob_short_ratio: float = 0.0
+    all_blue_ratio: float = 0.0
     present: bool = False
 
     def to_dict(self) -> dict:
@@ -101,6 +104,9 @@ class BlueStats:
             "largest_area": int(self.largest_area),
             "mean_v": round(float(self.mean_v), 1),
             "face_width": round(float(self.face_width), 1),
+            "max_blob_long_ratio": round(float(self.max_blob_long_ratio), 3),
+            "min_blob_short_ratio": round(float(self.min_blob_short_ratio), 3),
+            "all_blue_ratio": round(float(self.all_blue_ratio), 4),
             "present": self.present,
         }
 
